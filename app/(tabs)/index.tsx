@@ -1,6 +1,9 @@
 import { Picker } from '@react-native-picker/picker';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
+  AppState,
+  AppStateStatus,
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -21,9 +24,12 @@ export default function TimerScreen() {
   const [seconds, setSeconds] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(CATEGORIES[0]);
+  const [distractionCount, setDistractionCount] = useState(0);
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const appState = useRef(AppState.currentState);
 
+  // TIMER MEKANİZMASI
   useEffect(() => {
     if (isRunning) {
       intervalRef.current = setInterval(() => {
@@ -50,18 +56,42 @@ export default function TimerScreen() {
     };
   }, [isRunning]);
 
-  const handleStart = () => {
-    setIsRunning(true);
+  // APSTATE DİNLEYİCİSİ – **GÜN 2 YENİ EKLENTİ**
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+    return () => subscription.remove();
+  }, [isRunning]);
+
+  const handleAppStateChange = (nextState: AppStateStatus) => {
+    if (
+      appState.current === 'active' &&
+      nextState.match(/inactive|background/) &&
+      isRunning
+    ) {
+      // Dikkat dağıldı
+      setDistractionCount((prev) => prev + 1);
+      setIsRunning(false);
+
+      Alert.alert(
+        'Dikkat Dağınıklığı!',
+        'Uygulamadan ayrıldığınız için sayaç durduruldu.',
+        [{ text: 'Tamam' }]
+      );
+    }
+
+    appState.current = nextState;
   };
 
-  const handlePause = () => {
-    setIsRunning(false);
-  };
+  // buton işlemleri
+  const handleStart = () => setIsRunning(true);
+  const handlePause = () => setIsRunning(false);
 
   const handleReset = () => {
     setIsRunning(false);
     setMinutes(25);
     setSeconds(0);
+    setDistractionCount(0);
   };
 
   const formatTime = (m: number, s: number) => {
@@ -72,7 +102,7 @@ export default function TimerScreen() {
     <ScrollView style={styles.container}>
       <View style={styles.content}>
 
-        {/* Kategori Seçimi */}
+        {/* KATEGORİ */}
         <View style={styles.categoryContainer}>
           <Text style={styles.label}>Kategori Seçin:</Text>
           <View style={styles.pickerContainer}>
@@ -89,7 +119,7 @@ export default function TimerScreen() {
           </View>
         </View>
 
-        {/* Timer */}
+        {/* TIMER */}
         <View style={styles.timerContainer}>
           <View style={styles.timerCircle}>
             <Text style={styles.timer}>{formatTime(minutes, seconds)}</Text>
@@ -99,7 +129,15 @@ export default function TimerScreen() {
           </View>
         </View>
 
-        {/* Butonlar */}
+        {/* DİKKAT DAĞINIKLIĞI */}
+        <View style={styles.statsContainer}>
+          <View style={styles.statBox}>
+            <Text style={styles.statNumber}>{distractionCount}</Text>
+            <Text style={styles.statLabel}>Dikkat Dağınıklığı</Text>
+          </View>
+        </View>
+
+        {/* BUTONLAR */}
         <View style={styles.buttonContainer}>
           {!isRunning ? (
             <TouchableOpacity style={styles.startButton} onPress={handleStart}>
@@ -122,23 +160,10 @@ export default function TimerScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  content: {
-    padding: 20,
-  },
-  categoryContainer: {
-    marginTop: 10,
-    marginBottom: 30,
-  },
-  label: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 10,
-    color: '#333',
-  },
+  container: { flex: 1, backgroundColor: '#f5f5f5' },
+  content: { padding: 20 },
+  categoryContainer: { marginTop: 10, marginBottom: 30 },
+  label: { fontSize: 18, fontWeight: '600', marginBottom: 10, color: '#333' },
   pickerContainer: {
     backgroundColor: 'white',
     borderRadius: 12,
@@ -146,13 +171,9 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
     overflow: 'hidden',
   },
-  picker: {
-    height: 50,
-  },
-  timerContainer: {
-    alignItems: 'center',
-    marginVertical: 30,
-  },
+  picker: { height: 50 },
+
+  timerContainer: { alignItems: 'center', marginVertical: 30 },
   timerCircle: {
     width: 260,
     height: 260,
@@ -166,19 +187,22 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
   },
-  timer: {
-    fontSize: 60,
-    fontWeight: 'bold',
-    color: '#6366f1',
+  timer: { fontSize: 60, fontWeight: 'bold', color: '#6366f1' },
+  timerLabel: { fontSize: 14, color: '#666', marginTop: 10 },
+
+  statsContainer: { alignItems: 'center', marginBottom: 30 },
+  statBox: {
+    backgroundColor: 'white',
+    padding: 20,
+    borderRadius: 12,
+    alignItems: 'center',
+    minWidth: 200,
+    elevation: 3,
   },
-  timerLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 10,
-  },
-  buttonContainer: {
-    gap: 15,
-  },
+  statNumber: { fontSize: 36, fontWeight: 'bold', color: '#ef4444' },
+  statLabel: { fontSize: 14, color: '#666', marginTop: 5 },
+
+  buttonContainer: { gap: 15 },
   startButton: {
     backgroundColor: '#10b981',
     padding: 18,
@@ -197,9 +221,5 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
   },
-  buttonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
+  buttonText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
 });
