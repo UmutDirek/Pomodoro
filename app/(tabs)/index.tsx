@@ -26,6 +26,7 @@ export default function TimerScreen() {
   const [selectedCategory, setSelectedCategory] = useState(CATEGORIES[0]);
   const [distractionCount, setDistractionCount] = useState(0);
 
+  const [initialMinutes, setInitialMinutes] = useState(25); // GÜN 3
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const appState = useRef(AppState.currentState);
 
@@ -37,7 +38,7 @@ export default function TimerScreen() {
           if (prevSeconds === 0) {
             setMinutes((prevMinutes) => {
               if (prevMinutes === 0) {
-                setIsRunning(false); // süre bitti
+                setIsRunning(false);
                 return 0;
               }
               return prevMinutes - 1;
@@ -56,10 +57,9 @@ export default function TimerScreen() {
     };
   }, [isRunning]);
 
-  // APSTATE DİNLEYİCİSİ – **GÜN 2 YENİ EKLENTİ**
+  // APPSTATE DİNLEYİCİSİ (GÜN 2)
   useEffect(() => {
     const subscription = AppState.addEventListener('change', handleAppStateChange);
-
     return () => subscription.remove();
   }, [isRunning]);
 
@@ -69,7 +69,6 @@ export default function TimerScreen() {
       nextState.match(/inactive|background/) &&
       isRunning
     ) {
-      // Dikkat dağıldı
       setDistractionCount((prev) => prev + 1);
       setIsRunning(false);
 
@@ -83,20 +82,34 @@ export default function TimerScreen() {
     appState.current = nextState;
   };
 
-  // buton işlemleri
-  const handleStart = () => setIsRunning(true);
+  // BAŞLATMA – GÜN 3 GELİŞTİRME
+  const handleStart = () => {
+    if (!isRunning && seconds === 0 && minutes === initialMinutes) {
+      setInitialMinutes(minutes);
+    }
+    setIsRunning(true);
+  };
+
   const handlePause = () => setIsRunning(false);
 
   const handleReset = () => {
     setIsRunning(false);
-    setMinutes(25);
+    setMinutes(initialMinutes);
     setSeconds(0);
     setDistractionCount(0);
   };
 
-  const formatTime = (m: number, s: number) => {
-    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  // GÜN 3 — SÜRE AYARLAMA
+  const adjustMinutes = (value: number) => {
+    if (!isRunning) {
+      const newValue = Math.max(1, Math.min(60, minutes + value));
+      setMinutes(newValue);
+      setInitialMinutes(newValue);
+    }
   };
+
+  const formatTime = (m: number, s: number) =>
+    `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 
   return (
     <ScrollView style={styles.container}>
@@ -127,6 +140,27 @@ export default function TimerScreen() {
               {isRunning ? 'Çalışıyor...' : 'Hazır'}
             </Text>
           </View>
+
+          {/* GÜN 3 – SÜRE AYAR DÜĞMELERİ */}
+          {!isRunning && (
+            <View style={styles.adjustContainer}>
+              <TouchableOpacity style={styles.adjustButton} onPress={() => adjustMinutes(-5)}>
+                <Text style={styles.adjustButtonText}>-5 dk</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.adjustButton} onPress={() => adjustMinutes(-1)}>
+                <Text style={styles.adjustButtonText}>-1 dk</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.adjustButton} onPress={() => adjustMinutes(1)}>
+                <Text style={styles.adjustButtonText}>+1 dk</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.adjustButton} onPress={() => adjustMinutes(5)}>
+                <Text style={styles.adjustButtonText}>+5 dk</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         {/* DİKKAT DAĞINIKLIĞI */}
@@ -162,6 +196,7 @@ export default function TimerScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
   content: { padding: 20 },
+
   categoryContainer: { marginTop: 10, marginBottom: 30 },
   label: { fontSize: 18, fontWeight: '600', marginBottom: 10, color: '#333' },
   pickerContainer: {
@@ -175,9 +210,9 @@ const styles = StyleSheet.create({
 
   timerContainer: { alignItems: 'center', marginVertical: 30 },
   timerCircle: {
-    width: 260,
-    height: 260,
-    borderRadius: 130,
+    width: 280,
+    height: 280,
+    borderRadius: 140,
     backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
@@ -187,8 +222,25 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
   },
-  timer: { fontSize: 60, fontWeight: 'bold', color: '#6366f1' },
+  timer: { fontSize: 64, fontWeight: 'bold', color: '#6366f1' },
   timerLabel: { fontSize: 14, color: '#666', marginTop: 10 },
+
+  adjustContainer: {
+    flexDirection: 'row',
+    marginTop: 25,
+    gap: 10,
+  },
+  adjustButton: {
+    backgroundColor: '#e0e7ff',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  adjustButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6366f1',
+  },
 
   statsContainer: { alignItems: 'center', marginBottom: 30 },
   statBox: {
