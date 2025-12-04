@@ -4,6 +4,7 @@ import {
   AppState,
   AppStateStatus,
   Alert,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -26,11 +27,24 @@ export default function TimerScreen() {
   const [selectedCategory, setSelectedCategory] = useState(CATEGORIES[0]);
   const [distractionCount, setDistractionCount] = useState(0);
 
-  const [initialMinutes, setInitialMinutes] = useState(25); // GÜN 3
+  const [initialMinutes, setInitialMinutes] = useState(25);
+
+  // GÜN 4 – SUMMARY STATE
+  const [showSummary, setShowSummary] = useState(false);
+
+  interface SessionSummary {
+    category: string;
+    duration: number;
+    distractions: number;
+    date: string;
+  }
+
+  const [sessionSummary, setSessionSummary] = useState<SessionSummary | null>(null);
+
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const appState = useRef(AppState.currentState);
 
-  // TIMER MEKANİZMASI
+  // TIMER
   useEffect(() => {
     if (isRunning) {
       intervalRef.current = setInterval(() => {
@@ -38,7 +52,7 @@ export default function TimerScreen() {
           if (prevSeconds === 0) {
             setMinutes((prevMinutes) => {
               if (prevMinutes === 0) {
-                setIsRunning(false);
+                handleTimerComplete(); // GÜN 4
                 return 0;
               }
               return prevMinutes - 1;
@@ -57,7 +71,7 @@ export default function TimerScreen() {
     };
   }, [isRunning]);
 
-  // APPSTATE DİNLEYİCİSİ (GÜN 2)
+  // APPSTATE (DİKKAT DAĞINIKLIĞI)
   useEffect(() => {
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => subscription.remove();
@@ -82,7 +96,26 @@ export default function TimerScreen() {
     appState.current = nextState;
   };
 
-  // BAŞLATMA – GÜN 3 GELİŞTİRME
+  // GÜN 4 – TIMER TAMAMLANDI
+  const handleTimerComplete = () => {
+    setIsRunning(false);
+
+    const totalSeconds = initialMinutes * 60;
+
+    const summary = {
+      category: selectedCategory,
+      duration: totalSeconds,
+      distractions: distractionCount,
+      date: new Date().toISOString(),
+    };
+
+    setSessionSummary(summary);
+    setShowSummary(true);
+
+    Alert.alert('🎉 Tebrikler!', 'Odaklanma seansınız tamamlandı!');
+  };
+
+  // BUTONLAR
   const handleStart = () => {
     if (!isRunning && seconds === 0 && minutes === initialMinutes) {
       setInitialMinutes(minutes);
@@ -99,7 +132,12 @@ export default function TimerScreen() {
     setDistractionCount(0);
   };
 
-  // GÜN 3 — SÜRE AYARLAMA
+  const closeSummary = () => {
+    setShowSummary(false);
+    handleReset();
+  };
+
+  // SÜRE AYARLAMA
   const adjustMinutes = (value: number) => {
     if (!isRunning) {
       const newValue = Math.max(1, Math.min(60, minutes + value));
@@ -137,11 +175,11 @@ export default function TimerScreen() {
           <View style={styles.timerCircle}>
             <Text style={styles.timer}>{formatTime(minutes, seconds)}</Text>
             <Text style={styles.timerLabel}>
-              {isRunning ? 'Çalışıyor...' : 'Hazır'}
+              {isRunning ? 'Odaklanma Devam Ediyor...' : 'Hazır'}
             </Text>
           </View>
 
-          {/* GÜN 3 – SÜRE AYAR DÜĞMELERİ */}
+          {/* SÜRE AYAR BUTTONLARI */}
           {!isRunning && (
             <View style={styles.adjustContainer}>
               <TouchableOpacity style={styles.adjustButton} onPress={() => adjustMinutes(-5)}>
@@ -163,7 +201,7 @@ export default function TimerScreen() {
           )}
         </View>
 
-        {/* DİKKAT DAĞINIKLIĞI */}
+        {/* DİKKAT */}
         <View style={styles.statsContainer}>
           <View style={styles.statBox}>
             <Text style={styles.statNumber}>{distractionCount}</Text>
@@ -187,6 +225,53 @@ export default function TimerScreen() {
             <Text style={styles.buttonText}>↻ Sıfırla</Text>
           </TouchableOpacity>
         </View>
+
+        {/* GÜN 4 – MODAL */}
+        <Modal
+          visible={showSummary}
+          transparent
+          animationType="slide"
+          onRequestClose={closeSummary}
+        >
+          <View style={styles.modalContainer}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>🎯 Seans Özeti</Text>
+
+              {sessionSummary && (
+                <>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Kategori:</Text>
+                    <Text style={styles.summaryValue}>{sessionSummary.category}</Text>
+                  </View>
+
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Süre:</Text>
+                    <Text style={styles.summaryValue}>
+                      {Math.floor(sessionSummary.duration / 60)} dakika
+                    </Text>
+                  </View>
+
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Dikkat Dağınıklığı:</Text>
+                    <Text style={styles.summaryValue}>{sessionSummary.distractions}</Text>
+                  </View>
+
+                  <View style={styles.successBadge}>
+                    <Text style={styles.successText}>
+                      {sessionSummary.distractions === 0
+                        ? '✨ Mükemmel Odaklanma!'
+                        : '👏 Harika İş Çıkardınız!'}
+                    </Text>
+                  </View>
+                </>
+              )}
+
+              <TouchableOpacity style={styles.closeButton} onPress={closeSummary}>
+                <Text style={styles.buttonText}>Kapat</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
 
       </View>
     </ScrollView>
@@ -225,11 +310,7 @@ const styles = StyleSheet.create({
   timer: { fontSize: 64, fontWeight: 'bold', color: '#6366f1' },
   timerLabel: { fontSize: 14, color: '#666', marginTop: 10 },
 
-  adjustContainer: {
-    flexDirection: 'row',
-    marginTop: 25,
-    gap: 10,
-  },
+  adjustContainer: { flexDirection: 'row', marginTop: 25, gap: 10 },
   adjustButton: {
     backgroundColor: '#e0e7ff',
     paddingHorizontal: 16,
@@ -251,7 +332,11 @@ const styles = StyleSheet.create({
     minWidth: 200,
     elevation: 3,
   },
-  statNumber: { fontSize: 36, fontWeight: 'bold', color: '#ef4444' },
+  statNumber: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#ef4444',
+  },
   statLabel: { fontSize: 14, color: '#666', marginTop: 5 },
 
   buttonContainer: { gap: 15 },
@@ -274,4 +359,49 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   buttonText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
+
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    padding: 30,
+    borderRadius: 20,
+    width: '85%',
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    marginBottom: 25,
+    color: '#6366f1',
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginBottom: 15,
+    paddingHorizontal: 10,
+  },
+  summaryLabel: { fontSize: 16, color: '#666' },
+  summaryValue: { fontSize: 16, color: '#333', fontWeight: 'bold' },
+  successBadge: {
+    backgroundColor: '#dcfce7',
+    padding: 15,
+    borderRadius: 10,
+    marginVertical: 15,
+  },
+  successText: { fontSize: 16, color: '#16a34a', fontWeight: 'bold' },
+
+  closeButton: {
+    backgroundColor: '#6366f1',
+    padding: 15,
+    borderRadius: 10,
+    width: '100%',
+    alignItems: 'center',
+    marginTop: 15,
+  },
 });
