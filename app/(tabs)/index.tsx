@@ -12,6 +12,8 @@ import {
   View,
 } from 'react-native';
 
+import { saveSession } from '../../utils/storage'; 
+
 const CATEGORIES = [
   'Ders Çalışma',
   'Kodlama',
@@ -29,7 +31,6 @@ export default function TimerScreen() {
 
   const [initialMinutes, setInitialMinutes] = useState(25);
 
-  // GÜN 4 – SUMMARY STATE
   const [showSummary, setShowSummary] = useState(false);
 
   interface SessionSummary {
@@ -44,7 +45,6 @@ export default function TimerScreen() {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const appState = useRef(AppState.currentState);
 
-  // TIMER
   useEffect(() => {
     if (isRunning) {
       intervalRef.current = setInterval(() => {
@@ -52,7 +52,7 @@ export default function TimerScreen() {
           if (prevSeconds === 0) {
             setMinutes((prevMinutes) => {
               if (prevMinutes === 0) {
-                handleTimerComplete(); // GÜN 4
+                handleTimerComplete(); 
                 return 0;
               }
               return prevMinutes - 1;
@@ -71,7 +71,6 @@ export default function TimerScreen() {
     };
   }, [isRunning]);
 
-  // APPSTATE (DİKKAT DAĞINIKLIĞI)
   useEffect(() => {
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => subscription.remove();
@@ -79,7 +78,7 @@ export default function TimerScreen() {
 
   const handleAppStateChange = (nextState: AppStateStatus) => {
     if (
-      appState.current === 'active' &&
+      appState.current === "active" &&
       nextState.match(/inactive|background/) &&
       isRunning
     ) {
@@ -87,35 +86,38 @@ export default function TimerScreen() {
       setIsRunning(false);
 
       Alert.alert(
-        'Dikkat Dağınıklığı!',
-        'Uygulamadan ayrıldığınız için sayaç durduruldu.',
-        [{ text: 'Tamam' }]
+        "Dikkat Dağınıklığı!",
+        "Uygulamadan ayrıldığınız için sayaç durduruldu.",
+        [{ text: "Tamam" }]
       );
     }
 
     appState.current = nextState;
   };
 
-  // GÜN 4 – TIMER TAMAMLANDI
-  const handleTimerComplete = () => {
+  const handleTimerComplete = async () => {
     setIsRunning(false);
-
-    const totalSeconds = initialMinutes * 60;
 
     const summary = {
       category: selectedCategory,
-      duration: totalSeconds,
+      duration: initialMinutes * 60,
       distractions: distractionCount,
       date: new Date().toISOString(),
     };
 
+    try {
+      await saveSession(summary); 
+    } catch (error) {
+      console.log("Seans kayıt hatası:", error);
+    }
+
     setSessionSummary(summary);
     setShowSummary(true);
 
-    Alert.alert('🎉 Tebrikler!', 'Odaklanma seansınız tamamlandı!');
+    Alert.alert("🎉 Tebrikler!", "Odaklanma seansınız başarıyla tamamlandı!");
   };
 
-  // BUTONLAR
+  
   const handleStart = () => {
     if (!isRunning && seconds === 0 && minutes === initialMinutes) {
       setInitialMinutes(minutes);
@@ -137,7 +139,6 @@ export default function TimerScreen() {
     handleReset();
   };
 
-  // SÜRE AYARLAMA
   const adjustMinutes = (value: number) => {
     if (!isRunning) {
       const newValue = Math.max(1, Math.min(60, minutes + value));
@@ -147,13 +148,13 @@ export default function TimerScreen() {
   };
 
   const formatTime = (m: number, s: number) =>
-    `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 
   return (
     <ScrollView style={styles.container}>
       <View style={styles.content}>
 
-        {/* KATEGORİ */}
+        
         <View style={styles.categoryContainer}>
           <Text style={styles.label}>Kategori Seçin:</Text>
           <View style={styles.pickerContainer}>
@@ -163,23 +164,23 @@ export default function TimerScreen() {
               enabled={!isRunning}
               style={styles.picker}
             >
-              {CATEGORIES.map((category) => (
-                <Picker.Item key={category} label={category} value={category} />
+              {CATEGORIES.map((c) => (
+                <Picker.Item key={c} label={c} value={c} />
               ))}
             </Picker>
           </View>
         </View>
 
-        {/* TIMER */}
+        
         <View style={styles.timerContainer}>
           <View style={styles.timerCircle}>
             <Text style={styles.timer}>{formatTime(minutes, seconds)}</Text>
             <Text style={styles.timerLabel}>
-              {isRunning ? 'Odaklanma Devam Ediyor...' : 'Hazır'}
+              {isRunning ? "Odaklanma Devam Ediyor..." : "Hazır"}
             </Text>
           </View>
 
-          {/* SÜRE AYAR BUTTONLARI */}
+          
           {!isRunning && (
             <View style={styles.adjustContainer}>
               <TouchableOpacity style={styles.adjustButton} onPress={() => adjustMinutes(-5)}>
@@ -201,7 +202,7 @@ export default function TimerScreen() {
           )}
         </View>
 
-        {/* DİKKAT */}
+        
         <View style={styles.statsContainer}>
           <View style={styles.statBox}>
             <Text style={styles.statNumber}>{distractionCount}</Text>
@@ -209,7 +210,7 @@ export default function TimerScreen() {
           </View>
         </View>
 
-        {/* BUTONLAR */}
+        
         <View style={styles.buttonContainer}>
           {!isRunning ? (
             <TouchableOpacity style={styles.startButton} onPress={handleStart}>
@@ -226,7 +227,7 @@ export default function TimerScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* GÜN 4 – MODAL */}
+      
         <Modal
           visible={showSummary}
           transparent
@@ -247,7 +248,7 @@ export default function TimerScreen() {
                   <View style={styles.summaryRow}>
                     <Text style={styles.summaryLabel}>Süre:</Text>
                     <Text style={styles.summaryValue}>
-                      {Math.floor(sessionSummary.duration / 60)} dakika
+                      {sessionSummary.duration / 60} dakika
                     </Text>
                   </View>
 
@@ -259,8 +260,8 @@ export default function TimerScreen() {
                   <View style={styles.successBadge}>
                     <Text style={styles.successText}>
                       {sessionSummary.distractions === 0
-                        ? '✨ Mükemmel Odaklanma!'
-                        : '👏 Harika İş Çıkardınız!'}
+                        ? "✨ Mükemmel Odaklanma!"
+                        : "👏 Harika İş Çıkardınız!"}
                     </Text>
                   </View>
                 </>
