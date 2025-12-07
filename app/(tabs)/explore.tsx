@@ -19,6 +19,11 @@ interface Session {
 
 export default function ReportsScreen() {
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [stats, setStats] = useState({
+    todayTotal: 0,
+    allTimeTotal: 0,
+    totalDistractions: 0,
+  });
 
   useFocusEffect(
     React.useCallback(() => {
@@ -33,12 +38,56 @@ export default function ReportsScreen() {
   const loadData = async () => {
     const data = await getAllSessions();
     setSessions(data);
+    calculateStats(data);
+  };
+
+  const calculateStats = (data: Session[]) => {
+    const today = new Date().toDateString();
+    let todayTotal = 0;
+    let allTimeTotal = 0;
+    let totalDistractions = 0;
+
+    data.forEach((session) => {
+      const sessionDate = new Date(session.date).toDateString();
+
+      allTimeTotal += session.duration;
+      totalDistractions += session.distractions;
+
+      if (sessionDate === today) {
+        todayTotal += session.duration;
+      }
+    });
+
+    setStats({
+      todayTotal: Math.floor(todayTotal / 60),
+      allTimeTotal: Math.floor(allTimeTotal / 60),
+      totalDistractions,
+    });
   };
 
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Raporlar</Text>
+      </View>
+
+      <View style={styles.statsContainer}>
+        <View style={styles.statCard}>
+          <Text style={styles.statValue}>{stats.todayTotal}</Text>
+          <Text style={styles.statLabel}>Bugün (dk)</Text>
+        </View>
+
+        <View style={styles.statCard}>
+          <Text style={styles.statValue}>{stats.allTimeTotal}</Text>
+          <Text style={styles.statLabel}>Toplam (dk)</Text>
+        </View>
+
+        <View style={styles.statCard}>
+          <Text style={[styles.statValue, { color: '#ef4444' }]}>
+            {stats.totalDistractions}
+          </Text>
+          <Text style={styles.statLabel}>Dikkat Dağınıklığı</Text>
+        </View>
       </View>
 
       {sessions.length > 0 ? (
@@ -88,6 +137,37 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
+  },
+
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingHorizontal: 20,
+    paddingBottom: 10,
+    marginTop: 10,
+    gap: 10,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: 'white',
+    padding: 15,
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  statValue: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#6366f1',
+    marginBottom: 5,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#666',
   },
 
   sectionTitle: {
