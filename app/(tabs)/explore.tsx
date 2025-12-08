@@ -5,9 +5,13 @@ import {
   StyleSheet,
   Text,
   View,
+  Dimensions,
 } from 'react-native';
 
+import { BarChart } from 'react-native-chart-kit';
 import { getAllSessions } from '../../utils/storage';
+
+const screenWidth = Dimensions.get('window').width;
 
 interface Session {
   id: string;
@@ -65,6 +69,60 @@ export default function ReportsScreen() {
     });
   };
 
+  const getLast7DaysData = () => {
+    interface DayData {
+      date: string;
+      label: string;
+      duration: number;
+    }
+
+    const last7Days: DayData[] = [];
+    const today = new Date();
+
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+
+      last7Days.push({
+        date: date.toDateString(),
+        label: date.toLocaleDateString('tr-TR', {
+          day: '2-digit',
+          month: '2-digit',
+        }),
+        duration: 0,
+      });
+    }
+
+    sessions.forEach((session) => {
+      const sessionDate = new Date(session.date).toDateString();
+      const dayData = last7Days.find((d) => d.date === sessionDate);
+      if (dayData) {
+        dayData.duration += session.duration / 60;
+      }
+    });
+
+    return {
+      labels: last7Days.map((d) => d.label),
+      datasets: [
+        {
+          data: last7Days.map((d) => Math.max(Math.floor(d.duration), 0)),
+        },
+      ],
+    };
+  };
+
+  const chartConfig = {
+    backgroundGradientFrom: '#fff',
+    backgroundGradientTo: '#fff',
+    color: (opacity = 1) => `rgba(99, 102, 241, ${opacity})`,
+    strokeWidth: 2,
+    barPercentage: 0.7,
+    useShadowColorFromDataset: false,
+    propsForLabels: {
+      fontSize: 10,
+    },
+  };
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
@@ -86,34 +144,53 @@ export default function ReportsScreen() {
           <Text style={[styles.statValue, { color: '#ef4444' }]}>
             {stats.totalDistractions}
           </Text>
-          <Text style={styles.statLabel}>Dikkat Dağınıklığı</Text>
+          <Text style={styles.statLabel}>Dağınıklık</Text>
         </View>
       </View>
 
       {sessions.length > 0 ? (
-        <View style={styles.sessionsContainer}>
-          <Text style={styles.sectionTitle}>📝 Son Seanslar</Text>
+        <>
+          <View style={styles.chartContainer}>
+            <Text style={styles.chartTitle}>📊 Son 7 Gün Odaklanma</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <BarChart
+                data={getLast7DaysData()}
+                width={Math.max(screenWidth - 40, 350)}
+                height={220}
+                chartConfig={chartConfig}
+                yAxisLabel=""
+                yAxisSuffix=" dk"
+                fromZero
+                showValuesOnTopOfBars
+                style={styles.chart}
+              />
+            </ScrollView>
+          </View>
 
-          {sessions.slice(-5).reverse().map((session) => (
-            <View key={session.id} style={styles.sessionCard}>
-              <View style={styles.sessionHeader}>
-                <Text style={styles.sessionCategory}>{session.category}</Text>
-                <Text style={styles.sessionDate}>
-                  {new Date(session.date).toLocaleDateString('tr-TR')}
-                </Text>
-              </View>
+          <View style={styles.sessionsContainer}>
+            <Text style={styles.sectionTitle}>📝 Son Seanslar</Text>
 
-              <View style={styles.sessionDetails}>
-                <Text style={styles.sessionDetail}>
-                  ⏱ {Math.floor(session.duration / 60)} dk
-                </Text>
-                <Text style={styles.sessionDetail}>
-                  🔴 {session.distractions} dağınıklık
-                </Text>
+            {sessions.slice(-5).reverse().map((session) => (
+              <View key={session.id} style={styles.sessionCard}>
+                <View style={styles.sessionHeader}>
+                  <Text style={styles.sessionCategory}>{session.category}</Text>
+                  <Text style={styles.sessionDate}>
+                    {new Date(session.date).toLocaleDateString('tr-TR')}
+                  </Text>
+                </View>
+
+                <View style={styles.sessionDetails}>
+                  <Text style={styles.sessionDetail}>
+                    ⏱ {Math.floor(session.duration / 60)} dk
+                  </Text>
+                  <Text style={styles.sessionDetail}>
+                    🔴 {session.distractions} dağınıklık
+                  </Text>
+                </View>
               </View>
-            </View>
-          ))}
-        </View>
+            ))}
+          </View>
+        </>
       ) : (
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>Henüz kayıtlı bir seans yok.</Text>
@@ -124,20 +201,10 @@ export default function ReportsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
+  container: { flex: 1, backgroundColor: '#f5f5f5' },
 
-  header: {
-    padding: 20,
-    paddingBottom: 10,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-  },
+  header: { padding: 20, paddingBottom: 10 },
+  headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#333' },
 
   statsContainer: {
     flexDirection: 'row',
@@ -147,6 +214,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     gap: 10,
   },
+
   statCard: {
     flex: 1,
     backgroundColor: 'white',
@@ -159,25 +227,17 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+
   statValue: {
     fontSize: 28,
     fontWeight: 'bold',
     color: '#6366f1',
     marginBottom: 5,
   },
-  statLabel: {
-    fontSize: 12,
-    color: '#666',
-  },
 
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 15,
-  },
+  statLabel: { fontSize: 12, color: '#666' },
 
-  sessionsContainer: {
+  chartContainer: {
     backgroundColor: 'white',
     margin: 20,
     padding: 15,
@@ -189,44 +249,52 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
 
+  chartTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 15,
+  },
+
+  chart: { borderRadius: 8 },
+
+  sessionsContainer: {
+    backgroundColor: 'white',
+    margin: 20,
+    padding: 15,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    marginBottom: 30,
+  },
+
+  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#333', marginBottom: 15 },
+
   sessionCard: {
     backgroundColor: '#f9fafb',
     padding: 12,
     borderRadius: 8,
     marginBottom: 10,
   },
+
   sessionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 8,
   },
-  sessionCategory: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-  },
-  sessionDate: {
-    fontSize: 12,
-    color: '#666',
-  },
 
-  sessionDetails: {
-    flexDirection: 'row',
-    gap: 15,
-  },
-  sessionDetail: {
-    fontSize: 14,
-    color: '#666',
-  },
+  sessionCategory: { fontSize: 16, fontWeight: '600', color: '#333' },
 
-  emptyContainer: {
-    padding: 40,
-    alignItems: 'center',
-    marginTop: 50,
-  },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '500',
-    color: '#666',
-  },
+  sessionDate: { fontSize: 12, color: '#666' },
+
+  sessionDetails: { flexDirection: 'row', gap: 15 },
+
+  sessionDetail: { fontSize: 14, color: '#666' },
+
+  emptyContainer: { padding: 40, alignItems: 'center', marginTop: 50 },
+
+  emptyText: { fontSize: 18, fontWeight: '500', color: '#666' },
 });
