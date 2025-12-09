@@ -8,7 +8,7 @@ import {
   Dimensions,
 } from 'react-native';
 
-import { BarChart } from 'react-native-chart-kit';
+import { BarChart, PieChart } from 'react-native-chart-kit';
 import { getAllSessions } from '../../utils/storage';
 
 const screenWidth = Dimensions.get('window').width;
@@ -111,17 +111,38 @@ export default function ReportsScreen() {
     };
   };
 
+  const getCategoryData = () => {
+    const totals: { [key: string]: number } = {};
+
+    sessions.forEach((session) => {
+      if (!totals[session.category]) totals[session.category] = 0;
+      totals[session.category] += session.duration;
+    });
+
+    const colors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+
+    return Object.keys(totals).map((category, index) => ({
+      name: category,
+      population: Math.floor(totals[category] / 60),
+      color: colors[index % colors.length],
+      legendFontColor: '#666',
+      legendFontSize: 12,
+      duration: totals[category],
+    }));
+  };
+
   const chartConfig = {
     backgroundGradientFrom: '#fff',
     backgroundGradientTo: '#fff',
     color: (opacity = 1) => `rgba(99, 102, 241, ${opacity})`,
     strokeWidth: 2,
     barPercentage: 0.7,
-    useShadowColorFromDataset: false,
     propsForLabels: {
       fontSize: 10,
     },
   };
+
+  const categoryChartData = getCategoryData();
 
   return (
     <ScrollView style={styles.container}>
@@ -166,6 +187,23 @@ export default function ReportsScreen() {
               />
             </ScrollView>
           </View>
+
+          {categoryChartData.length > 0 && (
+            <View style={styles.chartContainer}>
+              <Text style={styles.chartTitle}>🎯 Kategorilere Göre Dağılım</Text>
+
+              <PieChart
+                data={categoryChartData}
+                width={screenWidth - 40}
+                height={220}
+                chartConfig={chartConfig}
+                accessor="population"
+                backgroundColor="transparent"
+                paddingLeft="15"
+                style={styles.chart}
+              />
+            </View>
+          )}
 
           <View style={styles.sessionsContainer}>
             <Text style={styles.sectionTitle}>📝 Son Seanslar</Text>
