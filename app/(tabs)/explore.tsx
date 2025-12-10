@@ -1,15 +1,17 @@
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useEffect, useState } from 'react';
 import {
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
   Dimensions,
 } from 'react-native';
 
 import { BarChart, PieChart } from 'react-native-chart-kit';
-import { getAllSessions } from '../../utils/storage';
+import { getAllSessions, clearAllSessions } from '../../utils/storage';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -127,8 +129,26 @@ export default function ReportsScreen() {
       color: colors[index % colors.length],
       legendFontColor: '#666',
       legendFontSize: 12,
-      duration: totals[category],
     }));
+  };
+
+  const handleClearData = () => {
+    Alert.alert(
+      'Tüm Verileri Sil',
+      'Tüm odaklanma seansı verileriniz silinecek. Emin misiniz?',
+      [
+        { text: 'İptal', style: 'cancel' },
+        {
+          text: 'Sil',
+          style: 'destructive',
+          onPress: async () => {
+            await clearAllSessions();
+            await loadData();
+            Alert.alert('Başarılı', 'Tüm veriler silindi.');
+          },
+        },
+      ]
+    );
   };
 
   const chartConfig = {
@@ -147,7 +167,13 @@ export default function ReportsScreen() {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Raporlar</Text>
+        <Text style={styles.headerTitle}>İstatistiklerim</Text>
+
+        {sessions.length > 0 && (
+          <TouchableOpacity onPress={handleClearData} style={styles.clearButton}>
+            <Text style={styles.clearButtonText}>Verileri Temizle</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.statsContainer}>
@@ -231,7 +257,11 @@ export default function ReportsScreen() {
         </>
       ) : (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>Henüz kayıtlı bir seans yok.</Text>
+          <Text style={styles.emptyEmoji}>📱</Text>
+          <Text style={styles.emptyText}>Hiç veri yok</Text>
+          <Text style={styles.emptySubtext}>
+            İlk odaklanma seansınızı tamamlayın ve ilerlemenizi burada görün.
+          </Text>
         </View>
       )}
     </ScrollView>
@@ -241,8 +271,32 @@ export default function ReportsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
 
-  header: { padding: 20, paddingBottom: 10 },
-  headerTitle: { fontSize: 24, fontWeight: 'bold', color: '#333' },
+  header: {
+    padding: 20,
+    paddingBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+
+  clearButton: {
+    backgroundColor: '#ef4444',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+
+  clearButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
 
   statsContainer: {
     flexDirection: 'row',
@@ -273,7 +327,7 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
 
-  statLabel: { fontSize: 12, color: '#666' },
+  statLabel: { fontSize: 12, color: '#666', textAlign: 'center' },
 
   chartContainer: {
     backgroundColor: 'white',
@@ -332,7 +386,28 @@ const styles = StyleSheet.create({
 
   sessionDetail: { fontSize: 14, color: '#666' },
 
-  emptyContainer: { padding: 40, alignItems: 'center', marginTop: 50 },
+  emptyContainer: {
+    padding: 40,
+    alignItems: 'center',
+    marginTop: 50,
+  },
 
-  emptyText: { fontSize: 18, fontWeight: '500', color: '#666' },
+  emptyEmoji: {
+    fontSize: 60,
+    marginBottom: 15,
+  },
+
+  emptyText: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 5,
+  },
+
+  emptySubtext: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+  },
 });
