@@ -81,7 +81,7 @@ export default function ReportsScreen() {
     const last7Days: DayData[] = [];
     const today = new Date();
 
-    for (let i = 6; i >= 0; i--) {
+    for (let i = 7; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
 
@@ -207,7 +207,7 @@ export default function ReportsScreen() {
                 chartConfig={chartConfig}
                 yAxisLabel=""
                 yAxisSuffix=" dk"
-                fromZero
+                yAxisInterval={1}
                 showValuesOnTopOfBars
                 style={styles.chart}
               />
