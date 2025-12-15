@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useKeepAwake } from 'expo-keep-awake';
 
 import { saveSession } from '../../utils/storage'; 
 
@@ -23,6 +24,7 @@ const CATEGORIES = [
 ];
 
 export default function TimerScreen() {
+  useKeepAwake();
   const [minutes, setMinutes] = useState(25);
   const [seconds, setSeconds] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
@@ -483,3 +485,4 @@ const styles = StyleSheet.create({
     marginTop: 15,
   },
 });
+
