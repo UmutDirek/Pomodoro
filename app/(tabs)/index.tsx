@@ -30,8 +30,9 @@ export default function TimerScreen() {
   const [distractionCount, setDistractionCount] = useState(0);
 
   const [initialMinutes, setInitialMinutes] = useState(25);
-
   const [showSummary, setShowSummary] = useState(false);
+  const [wasDistracted, setWasDistracted] = useState(false); 
+
 
   interface SessionSummary {
     category: string;
@@ -42,9 +43,8 @@ export default function TimerScreen() {
 
   const [sessionSummary, setSessionSummary] = useState<SessionSummary | null>(null);
 
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const appState = useRef(AppState.currentState);
-
+const intervalRef = useRef<any>(null);  
+const appState = useRef<AppStateStatus>(AppState.currentState);
   useEffect(() => {
     if (isRunning) {
       intervalRef.current = setInterval(() => {
@@ -76,23 +76,34 @@ export default function TimerScreen() {
     return () => subscription.remove();
   }, [isRunning]);
 
-  const handleAppStateChange = (nextState: AppStateStatus) => {
+
+const handleAppStateChange = (nextAppState: AppStateStatus) => { 
     if (
-      appState.current === "active" &&
-      nextState.match(/inactive|background/) &&
+      appState.current === 'active' &&
+      nextAppState.match(/inactive|background/) &&
       isRunning
     ) {
       setDistractionCount((prev) => prev + 1);
       setIsRunning(false);
-
-      Alert.alert(
-        "Dikkat Dağınıklığı!",
-        "Uygulamadan ayrıldığınız için sayaç durduruldu.",
-        [{ text: "Tamam" }]
-      );
+      setWasDistracted(true);
     }
-
-    appState.current = nextState;
+    
+    if (
+      appState.current.match(/inactive|background/) &&
+      nextAppState === 'active' &&
+      wasDistracted
+    ) {
+      setTimeout(() => {
+        Alert.alert(
+          '⚠️ Dikkat Dağınıklığı!',
+          'Uygulamadan ayrıldığınız için sayaç durduruldu. Devam etmek için Başlat butonuna basın.',
+          [{ text: 'Tamam' }]
+        );
+        setWasDistracted(false);
+      }, 500);
+    }
+    
+    appState.current = nextAppState;
   };
 
   const handleTimerComplete = async () => {
@@ -126,6 +137,48 @@ export default function TimerScreen() {
   };
 
   const handlePause = () => setIsRunning(false);
+    const handleStop = () => {
+    if (minutes === initialMinutes && seconds === 0) {
+      Alert.alert('Uyarı', 'Henüz seans başlatılmadı.');
+      return;
+    }
+
+    Alert.alert(
+      'Seansı Bitir',
+      'Seansınızı bitirmek istediğinize emin misiniz? Özet kaydedilecektir.',
+      [
+        { text: 'İptal', style: 'cancel' },
+        {
+          text: 'Bitir',
+          style: 'destructive',
+          onPress: () => {
+            setIsRunning(false);
+            const elapsedSeconds = (initialMinutes * 60) - (minutes * 60 + seconds);
+            saveFinalSession(elapsedSeconds);
+          },
+        },
+      ]
+    );
+  };
+
+  const saveFinalSession = async (elapsedSeconds: number) => {
+    if (elapsedSeconds < 60) {
+      Alert.alert('Uyarı', 'En az 1 dakika çalışmalısınız.');
+      handleReset();
+      return;
+    }
+
+    const summary = {
+      category: selectedCategory,
+      duration: elapsedSeconds,
+      distractions: distractionCount,
+      date: new Date().toISOString(),
+    };
+
+    await saveSession(summary);
+    setSessionSummary(summary);
+    setShowSummary(true);
+  };
 
   const handleReset = () => {
     setIsRunning(false);
@@ -211,7 +264,7 @@ export default function TimerScreen() {
         </View>
 
         
-        <View style={styles.buttonContainer}>
+       <View style={styles.buttonContainer}>
           {!isRunning ? (
             <TouchableOpacity style={styles.startButton} onPress={handleStart}>
               <Text style={styles.buttonText}>▶ Başlat</Text>
@@ -222,11 +275,18 @@ export default function TimerScreen() {
             </TouchableOpacity>
           )}
 
+          <TouchableOpacity 
+            style={styles.stopButton} 
+            onPress={handleStop}
+            disabled={minutes === initialMinutes && seconds === 0}
+          >
+            <Text style={styles.buttonText}>⏹ Durdur</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity style={styles.resetButton} onPress={handleReset}>
             <Text style={styles.buttonText}>↻ Sıfırla</Text>
           </TouchableOpacity>
         </View>
-
       
         <Modal
           visible={showSummary}
@@ -236,19 +296,21 @@ export default function TimerScreen() {
         >
           <View style={styles.modalContainer}>
             <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>🎯 Seans Özeti</Text>
-
+            <Text style={styles.modalTitle}>
+                {sessionSummary && sessionSummary.duration >= initialMinutes * 60 
+                  ? '🎉 Tebrikler!' 
+                  : '📊 Seans Özeti'}
+              </Text>
               {sessionSummary && (
                 <>
                   <View style={styles.summaryRow}>
                     <Text style={styles.summaryLabel}>Kategori:</Text>
                     <Text style={styles.summaryValue}>{sessionSummary.category}</Text>
                   </View>
-
                   <View style={styles.summaryRow}>
                     <Text style={styles.summaryLabel}>Süre:</Text>
                     <Text style={styles.summaryValue}>
-                      {sessionSummary.duration / 60} dakika
+                      {Math.floor(sessionSummary.duration / 60)} dakika {sessionSummary.duration % 60} saniye
                     </Text>
                   </View>
 
@@ -257,11 +319,15 @@ export default function TimerScreen() {
                     <Text style={styles.summaryValue}>{sessionSummary.distractions}</Text>
                   </View>
 
-                  <View style={styles.successBadge}>
+           <View style={styles.successBadge}>
                     <Text style={styles.successText}>
-                      {sessionSummary.distractions === 0
-                        ? "✨ Mükemmel Odaklanma!"
-                        : "👏 Harika İş Çıkardınız!"}
+                      {sessionSummary.duration >= initialMinutes * 60
+                        ? sessionSummary.distractions === 0 
+                          ? '✨ Mükemmel Odaklanma! Hedefinizi tam olarak tamamladınız!' 
+                          : '👏 Harika İş Çıkardınız! Hedefinize ulaştınız!'
+                        : sessionSummary.distractions === 0
+                          ? '💪 İyi bir başlangıç! Dikkatiniz dağılmadı.'
+                          : '📈 Güzel çaba! Bir sonraki sefere daha iyi olacak.'}
                     </Text>
                   </View>
                 </>
@@ -352,6 +418,17 @@ const styles = StyleSheet.create({
     padding: 18,
     borderRadius: 12,
     alignItems: 'center',
+  },
+    stopButton: {
+    backgroundColor: '#8b5cf6',
+    padding: 18,
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#8b5cf6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
   },
   resetButton: {
     backgroundColor: '#ef4444',
